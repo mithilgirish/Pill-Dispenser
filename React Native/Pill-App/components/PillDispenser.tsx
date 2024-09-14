@@ -1,168 +1,345 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, TextInput, ScrollView, SafeAreaView, Platform, useColorScheme } from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+import { BlurView } from 'expo-blur';
+
+// ESP32 IP Address (Replace with the actual ESP32 IP)
+const ESP32_IP = 'http://172.20.10.4'; // Replace with your ESP32's IP address
+
+interface PillBox {
+  id: number;
+  name: string;
+  count: number;
+}
 
 const PillDispenser = () => {
-  const [ws, setWs] = useState<WebSocket | null>(null);  // WebSocket or null type
-  const [rfidTag, setRfidTag] = useState('');
-  const [pillData, setPillData] = useState([
-    { name: '', count: 0 },
-    { name: '', count: 0 },
-    { name: '', count: 0 },
-    { name: '', count: 0 },
-    { name: '', count: 0 },
+  const [message, setMessage] = useState('');
+  const [pillBoxes, setPillBoxes] = useState<PillBox[]>([
+    { id: 1, name: 'Pill 1', count: 10 },
+    { id: 2, name: 'Pill 2', count: 15 },
+    { id: 3, name: 'Pill 3', count: 20 },
+    { id: 4, name: 'Pill 4', count: 25 },
+    { id: 5, name: 'Pill 5', count: 30 },
   ]);
+  const [editingBox, setEditingBox] = useState<PillBox | null>(null);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [newName, setNewName] = useState('');
 
-  useEffect(() => {
-    const socket = new WebSocket('ws://YOUR_ESP32_IP:8080');
-    
-    socket.onopen = () => {
-      console.log('WebSocket connected');
-      setWs(socket);  // Now TypeScript will not complain
-    };
-    
-    socket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === 'rfid') {
-        setRfidTag(data.tag);
-      } else if (data.type === 'pillData') {
-        setPillData(data.pills);
-      }
-    };
-    
-    return () => {
-      socket.close();
-    };
-  }, []);
+  const colorScheme = useColorScheme(); // Detect system theme (light or dark)
 
-  const handleServoToggle = (index: number, open: boolean) => {
-    if (ws) {
-      ws.send(JSON.stringify({
-        type: 'servo',
-        servo: index + 1,
-        open: open
-      }));
+  const moveServo = async (servoNumber: number, angle: number) => {
+    try {
+      const response = await fetch(`${ESP32_IP}/servo?number=${servoNumber}&angle=${angle}`);
+      const data = await response.text();
+      setMessage(data);
+      // Decrease pill count
+      setPillBoxes(pillBoxes.map(box => 
+        box.id === servoNumber ? { ...box, count: Math.max(0, box.count - 1) } : box
+      ));
+    } catch (error) {
+      setMessage('Error: Could not connect to ESP32');
     }
   };
 
-  const handlePillUpdate = (index: number) => {
-    if (ws) {
-      ws.send(JSON.stringify({
-        type: 'updatePill',
-        servo: index + 1,
-        name: pillData[index].name,
-        count: pillData[index].count
-      }));
+  const handleEdit = (box: PillBox) => {
+    setEditingBox(box);
+    setNewName(box.name);
+    setIsModalVisible(true);
+  };
+
+  const handleNameChange = () => {
+    if (editingBox) {
+      setPillBoxes(pillBoxes.map(box => 
+        box.id === editingBox.id ? { ...box, name: newName } : box
+      ));
     }
+    setIsModalVisible(false);
   };
 
-  const handleNameChange = (index: number, name: string) => {
-    const newPillData = [...pillData];
-    newPillData[index].name = name;
-    setPillData(newPillData);
-  };
+  const isDarkMode = colorScheme === 'dark';
 
-  const handleCountChange = (index: number, count: string) => {
-    const newPillData = [...pillData];
-    newPillData[index].count = parseInt(count) || 0;
-    setPillData(newPillData);
-  };
+  // Apply styles based on the current theme
+  const currentStyles = isDarkMode ? stylesDark : stylesLight;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView>
-        <Text style={styles.title}>Pill Dispenser Control</Text>
-        
-        <View style={styles.rfidContainer}>
-          <Text style={styles.rfidTitle}>RFID Tag</Text>
-          <Text style={styles.rfidTag}>{rfidTag || 'No tag detected'}</Text>
-        </View>
-        
-        {pillData.map((pill, index) => (
-          <View key={index} style={styles.card}>
-            <Text style={styles.cardTitle}>Dispenser {index + 1}</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Pill Name"
-              value={pill.name}
-              onChangeText={(text) => handleNameChange(index, text)}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Pill Count"
-              value={pill.count.toString()}
-              onChangeText={(text) => handleCountChange(index, text)}
-              keyboardType="numeric"
-            />
-            <View style={styles.buttonContainer}>
-              <Button title="Update" onPress={() => handlePillUpdate(index)} />
-              <Button title="Open" onPress={() => handleServoToggle(index, true)} />
-              <Button title="Close" onPress={() => handleServoToggle(index, false)} />
+  <SafeAreaView style={currentStyles.safeArea}>
+    <BlurView intensity={80} style={currentStyles.headerBlur}>
+      <View style={currentStyles.header}>
+        <Text style={currentStyles.title}>Pill Dispenser</Text>
+        <Text style={currentStyles.message}>{message}</Text>
+      </View>
+    </BlurView>
+    <ScrollView style={currentStyles.scrollView} contentContainerStyle={currentStyles.scrollViewContent}>
+      {pillBoxes.map((box) => (
+        <BlurView 
+          key={box.id} 
+          intensity={40} 
+          style={[
+            currentStyles.pillBoxBlur, 
+            box.id === 1 ? { marginTop: 20 } : null // Add marginTop conditionally for id === 1
+          ]}
+        >
+          <View style={currentStyles.pillBox}>
+            <View style={currentStyles.nameContainer}>
+              <Text style={currentStyles.pillName}>{box.name}</Text>
+              <TouchableOpacity onPress={() => handleEdit(box)}>
+                <Icon name="edit" size={24} color={isDarkMode ? "#FFF" : "#000"} /> 
+                {/* Adjust icon color for dark and light mode */}
+              </TouchableOpacity>
             </View>
+            <Text style={currentStyles.pillCount}>Count: {box.count}</Text>
+            <TouchableOpacity 
+              style={currentStyles.dispenseButton} 
+              onPress={() => moveServo(box.id, 90)}
+            >
+              <Text style={currentStyles.dispenseButtonText}>Dispense</Text>
+            </TouchableOpacity>
           </View>
-        ))}
-      </ScrollView>
-    </SafeAreaView>
-  );
+        </BlurView>
+      ))}
+    </ScrollView>
+    <Modal
+      visible={isModalVisible}
+      transparent={true}
+      animationType="fade"
+    >
+      <BlurView intensity={20} style={StyleSheet.absoluteFill}>
+        <View style={currentStyles.modalContainer}>
+          <View style={currentStyles.modalView}>
+            <TextInput
+              style={currentStyles.modalInput}
+              value={newName}
+              onChangeText={setNewName}
+              placeholder="Enter new name"
+              placeholderTextColor={isDarkMode ? "#FFF" : "#000"} // Adjust placeholder text color
+            />
+            <TouchableOpacity style={currentStyles.modalButton} onPress={handleNameChange}>
+              <Text style={currentStyles.modalButtonText}>Save</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={currentStyles.modalButton} onPress={() => setIsModalVisible(false)}>
+              <Text style={currentStyles.modalButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </BlurView>
+    </Modal>
+  </SafeAreaView>
+);
+
 };
 
-const styles = StyleSheet.create({
-  container: {
+// Light Mode Styles
+const stylesLight = StyleSheet.create({
+  safeArea: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  headerBlur: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollViewContent: {
+    paddingTop: 100,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  header: {
+    padding: 20,
+    backgroundColor: 'transparent',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
+    marginBottom: 10,
+    marginTop: 20,
     textAlign: 'center',
-    marginVertical: 20,
+    color: '#000',
   },
-  rfidContainer: {
-    backgroundColor: '#ffffff',
-    padding: 15,
-    marginHorizontal: 10,
-    marginBottom: 20,
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  rfidTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  rfidTag: {
+  message: {
     fontSize: 16,
+    color: 'green',
+    textAlign: 'center',
   },
-  card: {
-    backgroundColor: '#ffffff',
-    padding: 15,
-    marginHorizontal: 10,
-    marginBottom: 20,
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  pillBoxBlur: {
+    marginBottom: 15,
+    borderRadius: 10,
+    overflow: 'hidden',
   },
-  cardTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 10,
+  pillBox: {
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    padding: 20,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 4,
-    padding: 10,
-    marginBottom: 10,
-  },
-  buttonContainer: {
+  nameContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  pillName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#000',
+  },
+  pillCount: {
+    fontSize: 16,
+    marginBottom: 10,
+    color: '#000',
+  },
+  dispenseButton: {
+    backgroundColor: '#007AFF',
+    borderRadius: 5,
+    padding: 10,
+    alignItems: 'center',
+  },
+  dispenseButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalView: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 35,
+    alignItems: "center",
+  },
+  modalInput: {
+    height: 40,
+    margin: 12,
+    borderWidth: 1,
+    padding: 10,
+    width: 200,
+  },
+  modalButton: {
+    backgroundColor: "#2196F3",
+    borderRadius: 20,
+    padding: 10,
+    marginTop: 10,
+    width: 100,
+  },
+  modalButtonText: {
+    color: "white",
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+});
+
+// Dark Mode Styles
+const stylesDark = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#121212',
+  },
+  headerBlur: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollViewContent: {
+    paddingTop: 100,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  header: {
+    padding: 15,
+    backgroundColor: 'transparent',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    marginTop: 25,
+    textAlign: 'center',
+    color: '#FFF',
+  },
+  message: {
+    fontSize: 16,
+    color: 'green',
+    textAlign: 'center',
+  },
+  pillBoxBlur: {
+    marginBottom: 15,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  pillBox: {
+    marginStart: 10,
+    backgroundColor: 'transparent',
+    padding: 20,
+  },
+  nameContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  pillName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+  pillCount: {
+    fontSize: 16,
+    marginBottom: 10,
+    color: '#FFF',
+  },
+  dispenseButton: {
+    backgroundColor: '#007AFF',
+    borderRadius: 5,
+    padding: 10,
+    alignItems: 'center',
+  },
+  dispenseButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalView: {
+    backgroundColor: "#121212",
+    borderRadius: 20,
+    padding: 35,
+    alignItems: "center",
+  },
+  modalInput: {
+    height: 40,
+    margin: 12,
+    borderWidth: 1,
+    padding: 10,
+    width: 200,
+    borderColor: '#FFF',
+    color: '#FFF',
+  },
+  modalButton: {
+    backgroundColor: "#2196F3",
+    borderRadius: 20,
+    padding: 10,
+    marginTop: 10,
+    width: 100,
+  },
+  modalButtonText: {
+    color: "white",
+    fontWeight: "bold",
+    textAlign: "center",
   },
 });
 
