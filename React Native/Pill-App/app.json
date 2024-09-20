@@ -19,7 +19,14 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "android": {
+      "permissions": [
+        "INTERNET" 
+      ],
+      "usesCleartextTraffic": true
+    },
+      "package": "com.mithilgirish.PillApp"
     },
     "web": {
       "bundler": "metro",
@@ -31,6 +38,11 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "d40dd5c1-4a42-4fac-9015-72942e70c7ec"
+      }
     }
   }
 }

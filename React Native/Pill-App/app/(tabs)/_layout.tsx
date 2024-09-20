@@ -1,10 +1,33 @@
-import React from 'react';
-import PillDispenser from '../../components/PillDispenser'; // Adjust path as needed
+import { Tabs } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 
-const Layout = () => {
+export default function Layout() {
   return (
-    <PillDispenser />
-  );
-};
+    <Tabs
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName;
 
-export default Layout;
+          if (route.name === 'index') {
+            iconName = focused ? 'home' : 'home-outline';
+          } else if (route.name === 'Profile') {
+            iconName = focused ? 'person' : 'person-outline';
+          } 
+          
+
+          // TypeScript requires us to assert that iconName is a valid IconName
+          return <Ionicons name={iconName as keyof typeof Ionicons.glyphMap} size={size} color={color} />;
+        },
+      })}
+    >
+      <Tabs.Screen 
+        name="index" 
+        options={{ 
+          title: 'Pill Dispenser',
+          headerShown: false // This hides the header for the PillDispenser screen
+        }} 
+      />
+      <Tabs.Screen name="Profile" options={{ title: 'Profile' }} />
+    </Tabs>
+  );
+}
