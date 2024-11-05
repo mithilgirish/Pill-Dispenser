@@ -6,7 +6,7 @@ import axios from 'axios';
 import { useFocusEffect } from '@react-navigation/native';
 
 // ESP32 IP Address (Replace with the actual ESP32 IP)
-const ESP32_IP = 'http://192.168.0.107'; // Replace with your ESP32's IP address
+const ESP32_IP = process.env.IPaddress; // Replace with your ESP32's IP address
 
 interface PillBox {
   id: number;

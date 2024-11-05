@@ -6,7 +6,7 @@ import {
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const ESP32_IP = 'http://192.168.0.107';
+const ESP32_IP = process.env.IPaddress;
 
 // Define a type for the User
 type User = {

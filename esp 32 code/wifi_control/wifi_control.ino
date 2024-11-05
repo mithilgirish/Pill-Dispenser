@@ -166,16 +166,19 @@ void handleUpdatePills() {
       jsonResponse["status"] = "success";
       jsonResponse["message"] = "Pill count and name updated for Servo " + String(servoNumber);
       
+      // Serialize the JSON document to a String
       String jsonString;
       serializeJson(jsonResponse, jsonString);
       
-      server.send(200, "application/json", jsonResponse);
+      // Send the JSON response
+      server.send(200, "application/json", jsonString);
     } else {
       // Create an error response for invalid servo number
       StaticJsonDocument<256> jsonResponse;
       jsonResponse["status"] = "error";
       jsonResponse["message"] = "Invalid servo number. Must be 1-5.";
       
+      // Serialize the JSON document to a String
       String jsonString;
       serializeJson(jsonResponse, jsonString);
       server.send(400, "application/json", jsonString);
@@ -186,11 +189,13 @@ void handleUpdatePills() {
     jsonResponse["status"] = "error";
     jsonResponse["message"] = "Missing number, count, or name parameters.";
     
+    // Serialize the JSON document to a String
     String jsonString;
     serializeJson(jsonResponse, jsonString);
     server.send(400, "application/json", jsonString);
   }
 }
+
 
 
 // Write pill count to EEPROM
